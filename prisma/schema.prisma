@@ -1,0 +1,740 @@
+// Access Marketplace — Phase 1 data model
+// See ARCHITECTURE.md for the reasoning behind every non-obvious field.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// IDENTITY
+// ─────────────────────────────────────────────────────────────────────────
+
+enum VerificationLevel {
+  UNVERIFIED
+  BASIC_VERIFIED
+  IDENTITY_VERIFIED
+  PROVIDER_VERIFIED
+  BUSINESS_VERIFIED
+  TRUSTED_PROVIDER
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  phone             String?  @unique
+  passwordHash      String
+  fullName          String
+  emailVerifiedAt   DateTime?
+  phoneVerifiedAt   DateTime?
+  verificationLevel VerificationLevel @default(UNVERIFIED)
+  accountMode       AccountMode @default(PERSONAL)
+  isAdmin           Boolean  @default(false)
+  isSuspended       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  providerProfile   ProviderProfile?
+  business          BusinessMember[]
+  identityVerifications IdentityVerification[]
+  bookings          Booking[]           @relation("CustomerBookings")
+  listings          Listing[]           @relation("ProviderListings")
+  ledgerEntries     LedgerEntry[]
+  reviews           Review[]            @relation("ReviewAuthor")
+  reviewsReceived   Review[]            @relation("ReviewSubject")
+  favorites         Favorite[]
+  savedSearches     SavedSearch[]
+  messagesSent      Message[]           @relation("MessageSender")
+  notifications     Notification[]
+  disputesFiled     Dispute[]           @relation("DisputeFiledBy")
+  auditLogsActed    AuditLog[]          @relation("AuditActor")
+  sessions          Session[]
+  withdrawals       Withdrawal[]
+
+  @@index([email])
+}
+
+enum AccountMode {
+  PERSONAL
+  BUSINESS
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  ipAddress String?
+
+  @@index([userId])
+}
+
+model IdentityVerification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    String   // "stub" in dev, e.g. "smileid" / "dojah" in prod
+  status      VerificationStatus @default(PENDING)
+  externalRef String?
+  submittedAt DateTime @default(now())
+  decidedAt   DateTime?
+  metadata    Json?
+
+  @@index([userId])
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Business {
+  id          String   @id @default(cuid())
+  name        String
+  regNumber   String?
+  createdAt   DateTime @default(now())
+  members     BusinessMember[]
+  listings    Listing[]
+}
+
+model BusinessMember {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       StaffRole @default(STAFF)
+  createdAt  DateTime @default(now())
+
+  @@unique([businessId, userId])
+}
+
+enum StaffRole {
+  OWNER
+  MANAGER
+  STAFF
+  FINANCE
+  OPERATIONS
+}
+
+model ProviderProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName        String
+  bio                String?
+  verificationLevel  VerificationLevel @default(UNVERIFIED)
+  commissionOverride Int?     // basis points; null = use platform default
+  payoutBankCode     String?
+  payoutAccountNumber String?
+  payoutAccountName  String?
+  payoutInfoUpdatedAt DateTime?
+  subscriptionTier   SubscriptionTier @default(FREE)
+  createdAt          DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+  BUSINESS
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CATALOG
+// ─────────────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  parentId    String?
+  parent      Category? @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  attributes  CategoryAttribute[]
+  listings    Listing[]
+
+  @@index([parentId])
+  @@index([slug])
+}
+
+// Defines the dynamic filter/attribute schema per category (spec §16)
+// without needing a schema migration for every new category.
+model CategoryAttribute {
+  id          String   @id @default(cuid())
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  key         String   // e.g. "capacity", "hasGenerator", "brand"
+  label       String
+  type        AttributeType
+  options     Json?    // for SELECT/MULTI_SELECT
+  isFilterable Boolean @default(true)
+
+  @@unique([categoryId, key])
+}
+
+enum AttributeType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  SELECT
+  MULTI_SELECT
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  country   String
+  state     String
+  city      String
+  area      String?
+  lat       Float?
+  lng       Float?
+  listings  Listing[]
+
+  @@index([country, state, city])
+}
+
+model Listing {
+  id            String   @id @default(cuid())
+  providerId    String
+  provider      User     @relation("ProviderListings", fields: [providerId], references: [id])
+  businessId    String?
+  business      Business? @relation(fields: [businessId], references: [id])
+  categoryId    String
+  category      Category @relation(fields: [categoryId], references: [id])
+  locationId    String
+  location      Location @relation(fields: [locationId], references: [id])
+  title         String
+  description   String
+  status        ListingStatus @default(DRAFT)
+  instantBook   Boolean  @default(false)
+  attributeValues Json   @default("{}") // keyed by CategoryAttribute.key
+  cancellationPolicy CancellationPolicy @default(MODERATE)
+  minBookingMinutes  Int   @default(60)
+  maxBookingMinutes  Int?
+  prepMinutes        Int   @default(0)
+  cleanupMinutes     Int   @default(0)
+  exactAddress       String? // withheld from public search response
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  media         ListingMedia[]
+  availability  ListingAvailability[]
+  priceRules    ListingPriceRule[]
+  depositRule   ListingDepositRule?
+  bookings      Booking[]
+  favorites     Favorite[]
+  reviews       Review[]
+
+  @@index([categoryId])
+  @@index([locationId])
+  @@index([providerId])
+  @@index([status])
+}
+
+enum ListingStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum CancellationPolicy {
+  FLEXIBLE
+  MODERATE
+  STRICT
+}
+
+model ListingMedia {
+  id        String   @id @default(cuid())
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  url       String
+  type      MediaType
+  sortOrder Int      @default(0)
+
+  @@index([listingId])
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// Explicit recurring availability windows, e.g. "Mon-Fri 9-19".
+model ListingAvailability {
+  id        String   @id @default(cuid())
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  dayOfWeek Int      // 0=Sunday..6=Saturday, or -1 for a one-off blackout/open date
+  date      DateTime? // set when this row is a one-off override, not weekly
+  startTime String   // "09:00"
+  endTime   String   // "19:00"
+  isBlackout Boolean @default(false) // true = explicitly closed this window
+
+  @@index([listingId])
+}
+
+model ListingPriceRule {
+  id         String   @id @default(cuid())
+  listingId  String
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  unit       PriceUnit
+  amountKobo Int
+  appliesTo  PriceRuleScope @default(BASE) // BASE, WEEKEND, PEAK, SEASONAL
+  startDate  DateTime?
+  endDate    DateTime?
+
+  @@index([listingId])
+}
+
+enum PriceUnit {
+  HOURLY
+  DAILY
+  WEEKLY
+  MONTHLY
+  PER_PERSON
+  PER_UNIT
+  PER_SESSION
+}
+
+enum PriceRuleScope {
+  BASE
+  WEEKEND
+  PEAK
+  SEASONAL
+  EARLY_BOOKING_DISCOUNT
+  LAST_MINUTE
+}
+
+model ListingDepositRule {
+  id         String   @id @default(cuid())
+  listingId  String   @unique
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  mode       DepositMode @default(NONE)
+  fixedKobo  Int?
+  percentBps Int?     // basis points of booking amount, e.g. 3000 = 30%
+}
+
+enum DepositMode {
+  NONE
+  FIXED
+  PERCENT
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BOOKING
+// ─────────────────────────────────────────────────────────────────────────
+
+enum BookingStatus {
+  REQUESTED
+  PAYMENT_PENDING
+  PAID
+  CONFIRMED
+  CHECKED_IN
+  ACTIVE
+  CHECKOUT_PENDING
+  COMPLETED
+  PAYOUT_PENDING
+  PAYOUT_RELEASED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+  DISPUTED
+  UNDER_REVIEW
+  SUSPENDED
+  PAYMENT_FAILED
+}
+
+model Booking {
+  id             String   @id @default(cuid())
+  listingId      String
+  listing        Listing  @relation(fields: [listingId], references: [id])
+  customerId     String
+  customer       User     @relation("CustomerBookings", fields: [customerId], references: [id])
+  status         BookingStatus @default(REQUESTED)
+  startsAt       DateTime
+  endsAt         DateTime
+  quantity       Int      @default(1)
+  // Frozen at creation time so later price-rule edits never retroactively
+  // change an existing booking. See ARCHITECTURE.md §5.
+  priceSnapshot  Json
+  bookingAmountKobo Int
+  depositAmountKobo Int      @default(0)
+  commissionAmountKobo Int
+  totalAmountKobo   Int
+  accessCode     String?  // set on CONFIRMED, cleared after checkout
+  accessCodeExpiresAt DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  payments       Payment[]
+  ledgerEntries  LedgerEntry[]
+  deposit        Deposit?
+  payout         Payout?
+  disputes       Dispute[]
+  reviews        Review[]
+  messages       Message[]
+  conditionReports ConditionReport[]
+  auditLogs      AuditLog[]
+
+  @@index([listingId])
+  @@index([customerId])
+  @@index([status])
+  @@index([startsAt, endsAt])
+}
+
+// One row per checkout-time or checkin-time evidence submission.
+model ConditionReport {
+  id         String   @id @default(cuid())
+  bookingId  String
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  submittedBy String  // userId
+  stage      ConditionStage
+  notes      String?
+  mediaUrls  Json     @default("[]")
+  acknowledgedByCustomer Boolean @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([bookingId])
+}
+
+enum ConditionStage {
+  PRE_BOOKING
+  CHECK_IN
+  CHECK_OUT
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// PAYMENTS & LEDGER
+// ─────────────────────────────────────────────────────────────────────────
+
+model Payment {
+  id                String   @id @default(cuid())
+  bookingId         String
+  booking           Booking  @relation(fields: [bookingId], references: [id])
+  provider          String   @default("paystack")
+  providerReference String   @unique // Paystack transaction reference
+  amountKobo        Int
+  status            PaymentStatus @default(INITIATED)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  events            PaymentEvent[]
+
+  @@index([bookingId])
+  @@index([providerReference])
+}
+
+enum PaymentStatus {
+  INITIATED
+  SUCCESS
+  FAILED
+  ABANDONED
+}
+
+// One immutable row per webhook event received. Unique on providerEventId
+// is the idempotency guard against duplicate webhook delivery (spec §37).
+model PaymentEvent {
+  id              String   @id @default(cuid())
+  paymentId       String
+  payment         Payment  @relation(fields: [paymentId], references: [id])
+  providerEventId String   @unique
+  eventType       String   // e.g. "charge.success"
+  rawPayload      Json
+  receivedAt      DateTime @default(now())
+  processedAt     DateTime?
+  processingError String?
+}
+
+model LedgerEntry {
+  id             String   @id @default(cuid())
+  bookingId      String?
+  booking        Booking? @relation(fields: [bookingId], references: [id])
+  userId         String   // customer, provider, or the platform system-user
+  user           User     @relation(fields: [userId], references: [id])
+  type           LedgerEntryType
+  direction      LedgerDirection
+  amountKobo     Int
+  currency       String   @default("NGN")
+  status         LedgerEntryStatus @default(PENDING)
+  relatedPaymentEventId String?
+  reversalOfId   String?  @unique
+  reversalOf     LedgerEntry? @relation("Reversal", fields: [reversalOfId], references: [id])
+  reversedBy     LedgerEntry? @relation("Reversal")
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([bookingId])
+  @@index([type])
+}
+
+enum LedgerEntryType {
+  BOOKING_PAYMENT
+  DEPOSIT_HELD
+  DEPOSIT_REFUNDED
+  REFUND
+  GROSS_BOOKING_REVENUE
+  PLATFORM_COMMISSION
+  PROVIDER_EARNING_PENDING
+  PROVIDER_EARNING_AVAILABLE
+  WITHDRAWAL_REQUESTED
+  WITHDRAWAL_COMPLETED
+  DISPUTE_HOLD
+  REFUND_DEDUCTION
+}
+
+enum LedgerDirection {
+  CREDIT
+  DEBIT
+}
+
+enum LedgerEntryStatus {
+  PENDING
+  RESERVED
+  AVAILABLE
+  RELEASED
+  REVERSED
+}
+
+model Deposit {
+  id           String   @id @default(cuid())
+  bookingId    String   @unique
+  booking      Booking  @relation(fields: [bookingId], references: [id])
+  amountKobo   Int
+  status       DepositStatus @default(HELD)
+  claimReason  String?
+  claimEvidence Json?
+  resolvedAt   DateTime?
+  refundedKobo Int?
+
+  @@index([status])
+}
+
+enum DepositStatus {
+  HELD
+  UNDER_REVIEW
+  REFUND_APPROVED
+  PARTIAL_DEDUCTION
+  FULL_DEDUCTION
+  REFUNDED
+}
+
+model Payout {
+  id           String   @id @default(cuid())
+  bookingId    String   @unique
+  booking      Booking  @relation(fields: [bookingId], references: [id])
+  providerId   String
+  amountKobo   Int
+  availableAt  DateTime
+  holdReason   String?  // e.g. "DISPUTE" — blocks release regardless of availableAt
+  releasedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([providerId])
+  @@index([availableAt])
+}
+
+model Withdrawal {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  amountKobo   Int
+  status       WithdrawalStatus @default(PENDING)
+  destinationBankCode String
+  destinationAccountNumber String
+  requestedAt  DateTime @default(now())
+  processedAt  DateTime?
+  failureReason String?
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum WithdrawalStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TRUST & SAFETY
+// ─────────────────────────────────────────────────────────────────────────
+
+model Dispute {
+  id          String   @id @default(cuid())
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+  filedById   String
+  filedBy     User     @relation("DisputeFiledBy", fields: [filedById], references: [id])
+  reason      String
+  description String
+  status      DisputeStatus @default(OPEN)
+  assignedAdminId String?
+  resolution  String?
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+
+  evidence    DisputeEvidence[]
+
+  @@index([bookingId])
+  @@index([status])
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  WAITING_FOR_CUSTOMER
+  WAITING_FOR_PROVIDER
+  RESOLVED
+  REJECTED
+  ESCALATED
+}
+
+model DisputeEvidence {
+  id         String   @id @default(cuid())
+  disputeId  String
+  dispute    Dispute  @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  submittedBy String
+  url        String?
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+model RiskFlag {
+  id          String   @id @default(cuid())
+  userId      String
+  reason      String
+  severity    RiskSeverity
+  status      RiskFlagStatus @default(OPEN)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  reviewedAt  DateTime?
+}
+
+enum RiskSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum RiskFlagStatus {
+  OPEN
+  DISMISSED
+  CONFIRMED
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actor       User?    @relation("AuditActor", fields: [actorId], references: [id])
+  bookingId   String?
+  booking     Booking? @relation(fields: [bookingId], references: [id])
+  action      String
+  fromValue   String?
+  toValue     String?
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([bookingId])
+  @@index([actorId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ENGAGEMENT
+// ─────────────────────────────────────────────────────────────────────────
+
+model Review {
+  id          String   @id @default(cuid())
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+  listingId   String
+  listing     Listing  @relation(fields: [listingId], references: [id])
+  authorId    String
+  author      User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  subjectId   String
+  subject     User     @relation("ReviewSubject", fields: [subjectId], references: [id])
+  overallRating Int
+  categoryRatings Json  // { accuracy, communication, condition, reliability, value }
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  @@unique([bookingId, authorId])
+  @@index([listingId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  bookingId  String?
+  booking    Booking? @relation(fields: [bookingId], references: [id])
+  senderId   String
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
+  body       String
+  imageUrl   String?
+  isSystem   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([bookingId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id])
+  collection String  @default("default")
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  name      String
+  queryJson Json
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// PLATFORM CONFIG
+// ─────────────────────────────────────────────────────────────────────────
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #12212b;
+  --ink-soft: #26404d;
+  --paper: #ede6d6;
+  --paper-raised: #f6f1e6;
+  --brass: #b8863e;
+  --brass-dim: #8f6a30;
+  --signal: #2f6f5e;
+  --rust: #9b3b2e;
+  --line: rgba(18, 33, 43, 0.14);
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-brass: var(--brass);
+  --color-signal: var(--signal);
+  --color-rust: var(--rust);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+}
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ticket-stub perforation, used only on genuine pass/receipt elements. */
+.perforated {
+  position: relative;
+}
+.perforated::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 0;
+  border-left: 2px dashed var(--line);
+}
+
+.ticket-notch {
+  background:
+    radial-gradient(circle at 0 50%, transparent 8px, var(--paper) 8.5px) left center,
+    radial-gradient(circle at 100% 50%, transparent 8px, var(--paper) 8.5px) right center;
+  background-repeat: no-repeat;
+  background-size: 50% 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
