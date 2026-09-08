@@ -135,6 +135,15 @@ const CreateListingSchema = z.object({
       percentBps: z.number().int().min(0).max(10000).optional(),
     })
     .default({ mode: "NONE" }),
+  media: z
+    .array(
+      z.object({
+        url: z.string().url(),
+        type: z.enum(["IMAGE", "VIDEO"]).default("IMAGE"),
+      })
+    )
+    .max(10)
+    .default([]),
 });
 
 /** POST /api/listings — provider creates a new (draft) listing. */
@@ -179,6 +188,13 @@ export async function POST(req: NextRequest) {
                     percentBps: body.deposit.percentBps,
                   },
                 },
+          media: {
+            create: body.media.map((m, i) => ({
+              url: m.url,
+              type: m.type,
+              sortOrder: i,
+            })),
+          },
         },
       });
 

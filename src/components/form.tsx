@@ -14,7 +14,7 @@ export function FormField({
 }
 
 export const inputClass =
-  "w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2.5 text-base focus:border-brass";
+  "w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2.5 text-base focus:border-brass focus:ring-2 focus:ring-brass/20 outline-none transition-shadow";
 
 export const primaryButtonClass =
-  "w-full rounded-lg bg-ink text-paper font-medium py-3 hover:bg-[var(--ink-soft)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+  "w-full rounded-xl bg-grad-brand text-white font-medium py-3 hover:opacity-90 transition-opacity pop-shadow disabled:opacity-50 disabled:cursor-not-allowed";

@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { FormField, inputClass, primaryButtonClass } from "@/components/form";
+import { ImagePlus, Trash2, Video, ImageIcon } from "lucide-react";
+
+interface MediaItem {
+  url: string;
+  type: "IMAGE" | "VIDEO";
+}
 
 interface Category {
   id: string;
@@ -27,6 +33,10 @@ export default function NewListingPage() {
   const [amountNaira, setAmountNaira] = useState("");
   const [depositMode, setDepositMode] = useState<"NONE" | "FIXED" | "PERCENT">("NONE");
   const [depositValue, setDepositValue] = useState("");
+
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaType, setMediaType] = useState<"IMAGE" | "VIDEO">("IMAGE");
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,6 +73,7 @@ export default function NewListingPage() {
               : depositMode === "FIXED"
               ? { mode: "FIXED", fixedKobo: Math.round(Number(depositValue) * 100) }
               : { mode: "PERCENT", percentBps: Math.round(Number(depositValue) * 100) },
+          media,
         }),
       });
       router.push(`/listings/${result.id}`);
@@ -174,6 +185,64 @@ export default function NewListingPage() {
             </FormField>
           )}
         </div>
+
+        <FormField label="Photos & video">
+          <div className="space-y-3">
+            {media.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {media.map((m, i) => (
+                  <div key={m.url + i} className="relative aspect-square rounded-lg overflow-hidden border border-[var(--line)] bg-[var(--paper-raised)]">
+                    {m.type === "VIDEO" ? (
+                      <video src={m.url} className="w-full h-full object-cover" muted />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element -- arbitrary provider-supplied host
+                      <img src={m.url} alt="" className="w-full h-full object-cover" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setMedia((cur) => cur.filter((_, idx) => idx !== i))}
+                      className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 hover:bg-rust"
+                      aria-label="Remove"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <select
+                value={mediaType}
+                onChange={(e) => setMediaType(e.target.value as "IMAGE" | "VIDEO")}
+                className={`${inputClass} w-28 shrink-0`}
+              >
+                <option value="IMAGE">Photo</option>
+                <option value="VIDEO">Video</option>
+              </select>
+              <input
+                value={mediaUrl}
+                onChange={(e) => setMediaUrl(e.target.value)}
+                placeholder="Paste an image or video URL"
+                className={inputClass}
+              />
+              <button
+                type="button"
+                disabled={!mediaUrl.trim() || media.length >= 10}
+                onClick={() => {
+                  setMedia((cur) => [...cur, { url: mediaUrl.trim(), type: mediaType }]);
+                  setMediaUrl("");
+                }}
+                className="shrink-0 px-3 rounded-lg border border-[var(--line)] hover:border-brass disabled:opacity-40 flex items-center gap-1.5 text-sm"
+              >
+                <ImagePlus size={15} /> Add
+              </button>
+            </div>
+            <p className="text-xs text-[var(--ink-soft)] flex items-center gap-1.5">
+              {mediaType === "VIDEO" ? <Video size={12} /> : <ImageIcon size={12} />}
+              Paste links to photos/video you host elsewhere (e.g. your phone&apos;s cloud backup, a CDN). Direct file upload isn&apos;t wired up yet — that needs a storage bucket (e.g. S3 or Vercel Blob) on the backend.
+            </p>
+          </div>
+        </FormField>
 
         <label className="flex items-center gap-2 text-sm">
           <input

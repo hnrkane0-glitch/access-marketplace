@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import BookingWidget from "@/components/booking-widget";
+import { BadgeCheck, ShieldCheck, Wallet, Zap, PlayCircle } from "lucide-react";
+import { CATEGORY_ICON, CATEGORY_TINT, DEFAULT_CATEGORY_ICON, DEFAULT_CATEGORY_TINT } from "@/lib/category-visuals";
 
 const UNIT_LABEL: Record<string, string> = {
   HOURLY: "hour",
@@ -38,14 +40,50 @@ export default async function ListingPage({
   if (!listing || listing.status !== "ACTIVE") notFound();
 
   const basePrice = listing.priceRules[0];
+  const Icon = CATEGORY_ICON[listing.category.slug] ?? DEFAULT_CATEGORY_ICON;
+  const tint = CATEGORY_TINT[listing.category.slug] ?? DEFAULT_CATEGORY_TINT;
+  const [hero, ...rest] = listing.media;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-10 grid lg:grid-cols-[1.6fr_1fr] gap-10">
       <div>
-        <div className="aspect-[16/9] rounded-xl bg-[var(--line)] overflow-hidden" />
+        {hero ? (
+          <div className="grid grid-cols-4 grid-rows-2 gap-2 rounded-2xl overflow-hidden aspect-[16/9]">
+            <div className="col-span-4 sm:col-span-2 row-span-2 relative bg-[var(--line)]">
+              {hero.type === "VIDEO" ? (
+                <>
+                  <video src={hero.url} className="absolute inset-0 w-full h-full object-cover" muted loop playsInline />
+                  <PlayCircle size={40} className="absolute inset-0 m-auto text-white drop-shadow" />
+                </>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- provider-supplied media on arbitrary hosts
+                <img src={hero.url} alt={listing.title} className="absolute inset-0 w-full h-full object-cover" />
+              )}
+            </div>
+            {rest.slice(0, 4).map((m) => (
+              <div key={m.id} className="hidden sm:block relative bg-[var(--line)]">
+                {m.type === "VIDEO" ? (
+                  <>
+                    <video src={m.url} className="absolute inset-0 w-full h-full object-cover" muted loop playsInline />
+                    <PlayCircle size={20} className="absolute inset-0 m-auto text-white drop-shadow" />
+                  </>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element -- provider-supplied media on arbitrary hosts
+                  <img src={m.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={`aspect-[16/9] rounded-2xl overflow-hidden bg-gradient-to-br ${tint} flex items-center justify-center`}>
+            <Icon size={56} className="text-white/90" />
+          </div>
+        )}
 
         <div className="mt-6">
-          <p className="text-sm text-brass-dim font-medium">{listing.category.name}</p>
+          <p className="text-sm text-brass font-medium flex items-center gap-1.5">
+            <Icon size={14} /> {listing.category.name}
+          </p>
           <h1 className="text-3xl font-semibold tracking-tight mt-1">{listing.title}</h1>
           <p className="text-[var(--ink-soft)] mt-1">
             {listing.location.area ? `${listing.location.area}, ` : ""}
@@ -53,29 +91,29 @@ export default async function ListingPage({
           </p>
 
           {/* ACCESS READY trust panel — spec §81 */}
-          <div className="mt-6 rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] p-5">
-            <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)] font-mono mb-3">
-              Access Ready
+          <div className="mt-6 rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] p-5 card-shadow">
+            <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)] font-mono mb-3 flex items-center gap-1.5">
+              <ShieldCheck size={14} className="text-signal" /> Access Ready
             </p>
-            <ul className="grid sm:grid-cols-2 gap-2 text-sm">
+            <ul className="grid sm:grid-cols-2 gap-2.5 text-sm">
               <li className="flex items-center gap-2">
-                <span className="text-signal">✓</span>
+                <BadgeCheck size={16} className="text-signal shrink-0" />
                 {listing.provider.verificationLevel !== "UNVERIFIED"
                   ? "Verified provider"
                   : "Provider not yet verified"}
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-signal">✓</span>
+                <Wallet size={16} className="text-signal shrink-0" />
                 Secure payment via Paystack
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-signal">✓</span>
+                <ShieldCheck size={16} className="text-signal shrink-0" />
                 {listing.depositRule && listing.depositRule.mode !== "NONE"
                   ? "Deposit protected"
                   : "No deposit required"}
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-signal">✓</span>
+                <Zap size={16} className="text-signal shrink-0" />
                 {listing.instantBook ? "Instant booking" : "Request to book"}
               </li>
             </ul>
