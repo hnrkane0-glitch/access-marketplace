@@ -93,7 +93,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-[1.3fr_1fr] rounded-3xl overflow-hidden border border-[var(--line)] card-shadow">
             <div className="bg-[var(--paper-raised)] p-8 sm:p-12">
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide px-3 py-1 rounded-full bg-violet-100 text-violet-700">
-                <Zap size={12} fill="currentColor" /> Live in Lagos
+                <Zap size={12} fill="currentColor" /> Live across Nigeria
               </span>
               <h1 className="mt-4 text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.05] max-w-md">
                 Find what you need.{" "}

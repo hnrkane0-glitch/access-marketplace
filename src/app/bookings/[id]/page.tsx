@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import BookingActions from "@/components/booking-actions";
+import MessageThread from "@/components/message-thread";
+import ReviewForm from "@/components/review-form";
 
 function naira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString()}`;
@@ -30,6 +32,18 @@ export default async function BookingDetailPage({
   const isCustomer = booking.customerId === user.id;
   const isProvider = booking.listing.providerId === user.id;
   if (!isCustomer && !isProvider && !user.isAdmin) notFound();
+
+  const ELIGIBLE_REVIEW_STATUSES = ["COMPLETED", "PAYOUT_PENDING", "PAYOUT_RELEASED"];
+  const myExistingReview =
+    (isCustomer || isProvider) && ELIGIBLE_REVIEW_STATUSES.includes(booking.status)
+      ? await db.review.findUnique({
+          where: { bookingId_authorId: { bookingId: booking.id, authorId: user.id } },
+        })
+      : null;
+  const canReview =
+    (isCustomer || isProvider) &&
+    ELIGIBLE_REVIEW_STATUSES.includes(booking.status) &&
+    !myExistingReview;
 
   return (
     <div className="mx-auto max-w-2xl px-5 py-10">
@@ -105,6 +119,15 @@ export default async function BookingDetailPage({
             isCustomer={isCustomer}
             isProvider={isProvider}
           />
+
+          {(isCustomer || isProvider) && <MessageThread bookingId={booking.id} />}
+
+          {canReview && (
+            <ReviewForm
+              bookingId={booking.id}
+              subjectLabel={isCustomer ? booking.listing.provider.fullName : booking.customer.fullName}
+            />
+          )}
         </div>
       </div>
     </div>

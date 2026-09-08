@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { getProviderAvailableBalanceKobo, getProviderPendingBalanceKobo } from "@/lib/ledger";
 import { Wallet, Clock3, LayoutGrid, PlusCircle, ArrowRight, Zap, Rocket } from "lucide-react";
 import { CATEGORY_ICON, CATEGORY_TINT, DEFAULT_CATEGORY_ICON, DEFAULT_CATEGORY_TINT } from "@/lib/category-visuals";
+import WithdrawForm from "./withdraw-form";
 
 const STATUS_STYLE: Record<string, string> = {
   ACTIVE: "bg-emerald-100 text-emerald-700",
@@ -95,11 +96,10 @@ export default async function ProviderDashboardPage() {
         </div>
       </div>
 
-      {available >= 500_000 && (
-        <div className="mt-4">
-          <form action="/api/payouts/withdraw" method="post" className="inline">
-            <WithdrawButton available={available} />
-          </form>
+      {available > 0 && (
+        <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--paper-raised)] p-5 card-shadow">
+          <p className="text-sm font-medium mb-2">Withdraw earnings</p>
+          <WithdrawForm availableKobo={available} />
         </div>
       )}
 
@@ -174,14 +174,3 @@ export default async function ProviderDashboardPage() {
   );
 }
 
-function WithdrawButton({ available }: { available: number }) {
-  // Kept server-safe and simple: a real implementation wires this to a
-  // client component that calls /api/payouts/withdraw with a chosen
-  // amount. Left as a clearly-labeled next step rather than faked.
-  return (
-    <p className="text-sm text-[var(--ink-soft)]">
-      You have {naira(available)} available.{" "}
-      <span className="text-brass-dim">Withdraw flow: wire this button to /api/payouts/withdraw.</span>
-    </p>
-  );
-}

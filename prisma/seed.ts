@@ -82,11 +82,35 @@ async function main() {
     });
   }
 
-  const lagos = await db.location.findFirst({ where: { city: "Lagos" } });
-  if (!lagos) {
-    await db.location.create({
-      data: { country: "Nigeria", state: "Lagos", city: "Lagos", area: "Yaba" },
+  // Phase 1 is single-currency/single-country (NGN/Nigeria — see
+  // ARCHITECTURE.md §1), but the previous seed only had one row (Lagos,
+  // Yaba), so every search outside that one neighborhood came back empty.
+  // This widens coverage to Nigeria's major commercial hubs. Expanding
+  // beyond Nigeria needs multi-currency + a payment provider per market
+  // first, since pricing and Paystack are hard-wired to NGN today.
+  const locations: { state: string; city: string; area: string }[] = [
+    { state: "Lagos", city: "Lagos", area: "Yaba" },
+    { state: "Lagos", city: "Lagos", area: "Lekki" },
+    { state: "Lagos", city: "Lagos", area: "Victoria Island" },
+    { state: "Lagos", city: "Lagos", area: "Ikeja" },
+    { state: "Lagos", city: "Lagos", area: "Surulere" },
+    { state: "FCT", city: "Abuja", area: "Wuse" },
+    { state: "FCT", city: "Abuja", area: "Gwarinpa" },
+    { state: "Rivers", city: "Port Harcourt", area: "GRA" },
+    { state: "Oyo", city: "Ibadan", area: "Bodija" },
+    { state: "Kano", city: "Kano", area: "Nassarawa" },
+    { state: "Enugu", city: "Enugu", area: "Independence Layout" },
+    { state: "Delta", city: "Asaba", area: "Okpanam Road" },
+  ];
+  for (const loc of locations) {
+    const existing = await db.location.findFirst({
+      where: { city: loc.city, area: loc.area },
     });
+    if (!existing) {
+      await db.location.create({
+        data: { country: "Nigeria", state: loc.state, city: loc.city, area: loc.area },
+      });
+    }
   }
 
   console.log("Seed complete.");
