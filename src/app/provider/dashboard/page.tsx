@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getProviderAvailableBalanceKobo, getProviderPendingBalanceKobo } from "@/lib/ledger";
+import { getProviderPendingBalanceKobo, getWalletAvailableBalanceKobo } from "@/lib/ledger";
+import WalletActions from "@/components/wallet-actions";
 import { Wallet, Clock3, LayoutGrid, PlusCircle, ArrowRight, Zap, Rocket } from "lucide-react";
 import { CATEGORY_ICON, CATEGORY_TINT, DEFAULT_CATEGORY_ICON, DEFAULT_CATEGORY_TINT } from "@/lib/category-visuals";
-import WithdrawForm from "./withdraw-form";
 
 const STATUS_STYLE: Record<string, string> = {
   ACTIVE: "bg-emerald-100 text-emerald-700",
@@ -30,11 +30,12 @@ function daysUntil(date: Date): string {
 export default async function ProviderDashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (!["ACTIVE", "TRIALING"].includes(user.subscriptionStatus ?? "")) redirect("/plans");
   if (!user.isProvider) redirect("/provider/onboarding");
 
-  const [available, pending, listings, upcomingPayouts] = await Promise.all([
-    getProviderAvailableBalanceKobo(user.id),
+  const [pending, walletBalance, listings, upcomingPayouts] = await Promise.all([
     getProviderPendingBalanceKobo(user.id),
+    getWalletAvailableBalanceKobo(user.id),
     db.listing.findMany({
       where: { providerId: user.id },
       include: { category: true, media: { orderBy: { sortOrder: "asc" }, take: 1 } },
@@ -70,9 +71,9 @@ export default async function ProviderDashboardPage() {
             <Wallet size={17} />
           </div>
           <p className="mt-3 text-xs uppercase tracking-wide text-[var(--ink-soft)] font-mono">
-            Available to withdraw
+            Wallet available
           </p>
-          <p className="mt-1 text-2xl font-mono font-semibold text-signal">{naira(available)}</p>
+          <p className="mt-1 text-2xl font-mono font-semibold text-signal">{naira(walletBalance)}</p>
         </div>
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--paper-raised)] p-5 card-shadow">
           <div className="w-9 h-9 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center">
@@ -96,12 +97,9 @@ export default async function ProviderDashboardPage() {
         </div>
       </div>
 
-      {available > 0 && (
-        <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--paper-raised)] p-5 card-shadow">
-          <p className="text-sm font-medium mb-2">Withdraw earnings</p>
-          <WithdrawForm availableKobo={available} />
-        </div>
-      )}
+      <WalletActions availableKobo={walletBalance} />
+      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">Add-money payments and withdrawals are manually reconciled. Allow a few minutes for the dashboard to reflect a credit or withdrawal.</div>
+      <div className="mt-4"><Link href="/chat" className="text-brass font-medium hover:underline">Open provider & renter chat →</Link></div>
 
       {upcomingPayouts.length > 0 && (
         <div className="mt-10">

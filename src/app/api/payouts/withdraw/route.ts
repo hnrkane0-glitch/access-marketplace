@@ -1,69 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireProvider } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { handleApiError, userError } from "@/lib/api-error";
-import { getProviderAvailableBalanceKobo } from "@/lib/ledger";
+import { getWalletAvailableBalanceKobo } from "@/lib/ledger";
 import { getSetting } from "@/lib/platform-settings";
 import { LedgerEntryStatus, LedgerEntryType } from "@prisma/client";
+import { sendAdminEmail, nairaEmail } from "@/lib/email";
 
-const WithdrawSchema = z.object({ amountKobo: z.number().int().positive() });
+const Schema = z.object({
+  amountKobo: z.number().int().positive(),
+  bankName: z.string().min(2).max(120),
+  bankCode: z.string().min(2).max(30),
+  accountName: z.string().min(2).max(120),
+  accountNumber: z.string().regex(/^\d{10}$/, "Account number must be 10 digits."),
+});
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireProvider();
-    const { amountKobo } = WithdrawSchema.parse(await req.json());
-
-    const profile = await db.providerProfile.findUniqueOrThrow({ where: { userId: user.id } });
-
-    if (!profile.payoutBankCode || !profile.payoutAccountNumber) {
-      throw userError("Add a payout bank account before withdrawing.");
-    }
+    const user = await requireUser();
+    const body = Schema.parse(await req.json());
 
     const minWithdrawalKobo = await getSetting<number>("minWithdrawalKobo");
-    if (amountKobo < minWithdrawalKobo) {
+    if (body.amountKobo < minWithdrawalKobo) {
       throw userError(`Minimum withdrawal is ₦${(minWithdrawalKobo / 100).toLocaleString()}.`);
     }
 
-    // Payout-info changes get a cooling-off period before withdrawals are
-    // allowed against the new account (spec §34).
-    if (
-      profile.payoutInfoUpdatedAt &&
-      Date.now() - profile.payoutInfoUpdatedAt.getTime() < 24 * 60 * 60 * 1000
-    ) {
-      throw userError(
-        "Your payout account was changed recently. For security, withdrawals are on hold for 24 hours."
-      );
-    }
-
-    const openDispute = await db.dispute.findFirst({
-      where: {
-        booking: { listing: { providerId: user.id } },
-        status: { in: ["OPEN", "UNDER_REVIEW", "WAITING_FOR_PROVIDER", "WAITING_FOR_CUSTOMER"] },
-      },
-    });
-    // Note: this is a broad hold — Phase 2 should scope holds to only the
-    // disputed booking's specific earnings rather than the whole balance.
-    // Flagged deliberately conservative for Phase 1.
-    if (openDispute) {
-      throw userError("You have an open dispute. Withdrawals are paused until it's resolved.");
-    }
-
-    const available = await getProviderAvailableBalanceKobo(user.id);
-    if (amountKobo > available) {
-      throw userError(
-        `You're trying to withdraw more than your available balance (₦${(available / 100).toLocaleString()}).`
-      );
+    const available = await getWalletAvailableBalanceKobo(user.id);
+    if (body.amountKobo > available) {
+      throw userError(`Your available balance is ₦${(available / 100).toLocaleString()}.`);
     }
 
     const withdrawal = await db.$transaction(async (tx) => {
       const w = await tx.withdrawal.create({
         data: {
           userId: user.id,
-          amountKobo,
+          amountKobo: body.amountKobo,
           status: "PENDING",
-          destinationBankCode: profile.payoutBankCode!,
-          destinationAccountNumber: profile.payoutAccountNumber!,
+          destinationBankCode: body.bankCode,
+          destinationBankName: body.bankName,
+          destinationAccountNumber: body.accountNumber,
+          destinationAccountName: body.accountName,
         },
       });
 
@@ -72,7 +49,7 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           type: LedgerEntryType.WITHDRAWAL_REQUESTED,
           direction: "DEBIT",
-          amountKobo,
+          amountKobo: body.amountKobo,
           status: LedgerEntryStatus.RESERVED,
         },
       });
@@ -81,19 +58,24 @@ export async function POST(req: NextRequest) {
         data: {
           userId: user.id,
           type: "WITHDRAWAL_REQUESTED",
-          title: "Withdrawal requested",
-          body: `Your withdrawal request for ₦${(amountKobo / 100).toLocaleString()} has been received.`,
+          title: "Withdrawal pending",
+          body: `Your ${nairaEmail(body.amountKobo)} withdrawal request was received. Manual processing may take a few minutes.`,
         },
       });
-
       return w;
     });
 
-    // TODO(phase 1 wiring): call Paystack Transfer API here (or from a
-    // background job that picks up PENDING withdrawals) to actually move
-    // funds, then flip status PROCESSING → COMPLETED/FAILED based on the
-    // transfer.success / transfer.failed webhook. Not wired in this
-    // sandbox build — see ARCHITECTURE.md §8.
+    await sendAdminEmail(
+      `Pending withdrawal — ${nairaEmail(body.amountKobo)}`,
+      `<h2>Manual withdrawal requested</h2>
+       <p><strong>${user.fullName}</strong> (${user.email}) requested <strong>${nairaEmail(body.amountKobo)}</strong>.</p>
+       <h3>Bank details</h3>
+       <p>Bank: <strong>${body.bankName}</strong><br>
+       Bank code: <strong>${body.bankCode}</strong><br>
+       Account name: <strong>${body.accountName}</strong><br>
+       Account number: <strong>${body.accountNumber}</strong></p>
+       <p>Open Admin → Withdrawals, send the money manually through Paystack, then mark the request as sent.</p>`
+    );
 
     return NextResponse.json({ id: withdrawal.id, status: withdrawal.status }, { status: 201 });
   } catch (err) {

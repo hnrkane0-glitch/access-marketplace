@@ -73,7 +73,7 @@ export async function PATCH(
           await tx.ledgerEntry.create({
             data: {
               userId: withdrawal.userId,
-              type: LedgerEntryType.PROVIDER_EARNING_AVAILABLE,
+              type: LedgerEntryType.ADMIN_CREDIT,
               direction: "CREDIT",
               amountKobo: withdrawal.amountKobo,
               status: LedgerEntryStatus.AVAILABLE,

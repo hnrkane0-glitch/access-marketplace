@@ -96,6 +96,8 @@ export interface CurrentUser {
   isAdmin: boolean;
   isProvider: boolean;
   isSuspended: boolean;
+  subscriptionStatus: "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELLED" | "EXPIRED" | "PENDING" | null;
+  subscriptionTier: "STARTER" | "ETERNAL" | "PRO" | null;
 }
 
 /**
@@ -120,7 +122,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   const user = await db.user.findUnique({
     where: { id: payload.userId },
-    include: { providerProfile: true },
+    include: { providerProfile: true, accountSubscriptions: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
   if (!user || user.isSuspended) return null;
 
@@ -131,6 +133,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     isAdmin: user.isAdmin,
     isProvider: !!user.providerProfile,
     isSuspended: user.isSuspended,
+    subscriptionStatus: user.accountSubscriptions[0]?.status ?? null,
+    subscriptionTier: user.accountSubscriptions[0]?.tier ?? null,
   };
 }
 

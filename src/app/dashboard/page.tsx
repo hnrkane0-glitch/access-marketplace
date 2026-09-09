@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getCustomerReservedDepositsKobo } from "@/lib/ledger";
+import { getCustomerReservedDepositsKobo, getWalletAvailableBalanceKobo } from "@/lib/ledger";
+import WalletActions from "@/components/wallet-actions";
 import { LedgerEntryType, LedgerEntryStatus } from "@prisma/client";
 import { Wallet, ShieldCheck, CalendarClock, Compass, Sparkles, ArrowRight, CalendarDays } from "lucide-react";
 
@@ -33,8 +34,9 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (!["ACTIVE", "TRIALING"].includes(user.subscriptionStatus ?? "")) redirect("/plans");
 
-  const [bookings, totalSpentAgg, reservedDeposits] = await Promise.all([
+  const [bookings, totalSpentAgg, reservedDeposits, walletBalance] = await Promise.all([
     db.booking.findMany({
       where: { customerId: user.id },
       include: { listing: { select: { title: true, location: true } } },
@@ -50,6 +52,7 @@ export default async function DashboardPage() {
       _sum: { amountKobo: true },
     }),
     getCustomerReservedDepositsKobo(user.id),
+    getWalletAvailableBalanceKobo(user.id),
   ]);
 
   const upcoming = bookings.filter((b) =>
@@ -104,6 +107,12 @@ export default async function DashboardPage() {
           <p className="mt-1 text-2xl font-mono font-semibold">{upcoming.length}</p>
         </div>
       </div>
+
+      <WalletActions availableKobo={walletBalance} />
+
+      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">Add-money payments and withdrawals are manually reconciled. Allow a few minutes for the dashboard to reflect a credit or withdrawal.</div>
+
+      <div className="mt-5"><Link href="/chat" className="text-brass font-medium hover:underline">Open provider & renter chat →</Link></div>
 
       {!user.isProvider && (
         <div className="mt-6 rounded-2xl border border-dashed border-brass/40 bg-gradient-to-r from-violet-50 to-orange-50 p-5 flex items-center justify-between gap-4 flex-wrap">

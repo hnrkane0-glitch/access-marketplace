@@ -10,6 +10,8 @@ interface Row {
   email: string;
   amountKobo: number;
   bankCode: string;
+  bankName: string;
+  accountName: string;
   accountNumber: string;
   requestedAt: string;
   status: string;
@@ -68,7 +70,7 @@ export default function WithdrawalTable({ rows: initialRows }: { rows: Row[] }) 
                 </td>
                 <td className="px-4 py-3 font-medium">{naira(r.amountKobo)}</td>
                 <td className="px-4 py-3 text-xs text-white/50">
-                  {r.bankCode} &middot; {r.accountNumber}
+                  {r.bankName} ({r.bankCode}) · {r.accountName} · {r.accountNumber}
                 </td>
                 <td className="px-4 py-3 text-xs text-white/40">{new Date(r.requestedAt).toLocaleString()}</td>
                 <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">

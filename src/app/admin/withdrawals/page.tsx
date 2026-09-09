@@ -15,6 +15,8 @@ export default async function AdminWithdrawalsPage() {
     email: w.user.email,
     amountKobo: w.amountKobo,
     bankCode: w.destinationBankCode,
+    bankName: w.destinationBankName ?? "—",
+    accountName: w.destinationAccountName ?? "—",
     accountNumber: w.destinationAccountNumber,
     requestedAt: w.requestedAt.toISOString(),
     status: w.status,

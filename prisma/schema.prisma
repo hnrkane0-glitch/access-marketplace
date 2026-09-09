@@ -54,6 +54,10 @@ model User {
   auditLogsActed    AuditLog[]          @relation("AuditActor")
   sessions          Session[]
   withdrawals       Withdrawal[]
+  walletTopups      WalletTopup[]
+  accountSubscriptions AccountSubscription[]
+  chatParticipants  ChatParticipant[]
+  chatMessagesSent  ChatMessage[]
 
   @@index([email])
 }
@@ -134,6 +138,7 @@ model ProviderProfile {
   verificationLevel  VerificationLevel @default(UNVERIFIED)
   commissionOverride Int?     // basis points; null = use platform default
   payoutBankCode     String?
+  payoutBankName     String?
   payoutAccountNumber String?
   payoutAccountName  String?
   payoutInfoUpdatedAt DateTime?
@@ -425,14 +430,15 @@ enum ConditionStage {
 
 model Payment {
   id                String   @id @default(cuid())
-  bookingId         String
-  booking           Booking  @relation(fields: [bookingId], references: [id])
+  bookingId         String?
+  booking           Booking?  @relation(fields: [bookingId], references: [id])
   provider          String   @default("paystack")
   providerReference String   @unique // Paystack transaction reference
   amountKobo        Int
   status            PaymentStatus @default(INITIATED)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  metadata          Json?
 
   events            PaymentEvent[]
 
@@ -498,6 +504,7 @@ enum LedgerEntryType {
   REFUND_DEDUCTION
   ADMIN_CREDIT
   ADMIN_DEBIT
+  WALLET_TOPUP
 }
 
 enum LedgerDirection {
@@ -558,7 +565,9 @@ model Withdrawal {
   amountKobo   Int
   status       WithdrawalStatus @default(PENDING)
   destinationBankCode String
+  destinationBankName String?
   destinationAccountNumber String
+  destinationAccountName String?
   requestedAt  DateTime @default(now())
   processedAt  DateTime?
   failureReason String?
@@ -572,6 +581,100 @@ enum WithdrawalStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// WALLETS, SUBSCRIPTIONS & COMMUNITY
+// ─────────────────────────────────────────────────────────────────────────
+
+model WalletTopup {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerReference String   @unique
+  amountKobo        Int
+  status            WalletTopupStatus @default(PENDING)
+  createdAt         DateTime @default(now())
+  paidAt            DateTime?
+  adminNotifiedAt   DateTime?
+
+  @@index([userId, status])
+}
+
+enum WalletTopupStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum AccountSubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+  PENDING
+}
+
+model AccountSubscription {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier               AccountSubscriptionTier
+  planCode           String
+  status             AccountSubscriptionStatus @default(PENDING)
+  trialEndsAt        DateTime?
+  currentPeriodEnd   DateTime?
+  paystackCustomerCode String?
+  paystackAuthorizationCode String?
+  paystackSubscriptionCode String?
+  lastReference      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([planCode])
+}
+
+enum AccountSubscriptionTier {
+  STARTER
+  ETERNAL
+  PRO
+}
+
+model ChatThread {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  participants ChatParticipant[]
+  messages    ChatMessage[]
+
+  @@index([updatedAt])
+}
+
+model ChatParticipant {
+  id        String   @id @default(cuid())
+  threadId  String
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([threadId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  thread   ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([threadId, createdAt])
 }
 
 // ─────────────────────────────────────────────────────────────────────────

@@ -16,6 +16,8 @@ interface InitializeTransactionParams {
   reference: string;
   callbackUrl: string;
   metadata?: Record<string, unknown>;
+  planCode?: string;
+  channels?: string[];
 }
 
 interface InitializeTransactionResult {
@@ -44,6 +46,8 @@ export async function initializeTransaction(
       reference: params.reference,
       callback_url: params.callbackUrl,
       metadata: params.metadata ?? {},
+      ...(params.planCode ? { plan: params.planCode } : {}),
+      ...(params.channels ? { channels: params.channels } : {}),
     }),
   });
 
@@ -82,6 +86,8 @@ export async function verifyTransaction(reference: string) {
     amount: number;
     currency: string;
     metadata: Record<string, unknown>;
+    customer?: { customer_code?: string };
+    authorization?: { authorization_code?: string; channel?: string; reusable?: boolean };
     id: number; // Paystack's numeric transaction id — used as the idempotency key
   };
 }
@@ -103,4 +109,45 @@ export function verifyWebhookSignature(rawBody: string, signatureHeader: string 
   const b = Buffer.from(signatureHeader, "utf8");
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
+}
+
+
+export async function refundTransaction(reference: string, amountKobo?: number) {
+  const body: Record<string, unknown> = { transaction: reference };
+  if (amountKobo) body.amount = amountKobo;
+  const res = await fetch(`${PAYSTACK_BASE_URL}/refund`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requireSecretKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.status) throw new Error(`Paystack refund failed: ${json.message ?? res.statusText}`);
+  return json.data;
+}
+
+export async function createSubscription(params: {
+  customerCode: string;
+  planCode: string;
+  authorizationCode: string;
+  startDate?: string;
+}) {
+  const res = await fetch(`${PAYSTACK_BASE_URL}/subscription`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requireSecretKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      customer: params.customerCode,
+      plan: params.planCode,
+      authorization: params.authorizationCode,
+      ...(params.startDate ? { start_date: params.startDate } : {}),
+    }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.status) throw new Error(`Paystack subscription failed: ${json.message ?? res.statusText}`);
+  return json.data as { subscription_code: string; email_token: string; status: string };
 }

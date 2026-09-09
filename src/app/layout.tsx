@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { getCurrentUser } from "@/lib/auth";
 import Link from "next/link";
-import { Compass, LayoutGrid, Sparkles, Zap } from "lucide-react";
+import { Compass, LayoutGrid, Sparkles, Zap, MessageCircle, Settings, LogOut } from "lucide-react";
 import NotificationBell from "@/components/notification-bell";
 
 export const metadata: Metadata = {
@@ -34,6 +34,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/search?instantBook=true" className="flex items-center gap-1.5 text-[var(--ink-soft)] hover:text-brass transition-colors">
                 <Sparkles size={16} /> Available now
               </Link>
+              {user && <Link href="/chat" className="flex items-center gap-1.5 text-[var(--ink-soft)] hover:text-brass transition-colors"><MessageCircle size={16} /> Chat</Link>}
               {user?.isProvider && (
                 <Link href="/provider/dashboard" className="flex items-center gap-1.5 text-[var(--ink-soft)] hover:text-brass transition-colors">
                   <LayoutGrid size={16} /> Provider dashboard
@@ -52,6 +53,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   </span>
                   {user.fullName.split(" ")[0]}
                 </Link>
+                <Link href="/settings" className="text-[var(--ink-soft)] hover:text-brass" title="Membership & billing"><Settings size={16}/></Link>
+                <Link href="/logout" className="text-[var(--ink-soft)] hover:text-rust" title="Log out"><LogOut size={16}/></Link>
               ) : (
                 <>
                   <Link href="/login" className="hover:text-brass transition-colors font-medium">

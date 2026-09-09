@@ -177,3 +177,34 @@ export async function getCustomerReservedDepositsKobo(customerId: string): Promi
   });
   return held._sum.amountKobo ?? 0;
 }
+
+
+/**
+ * General spendable wallet balance. Admin credits and released provider
+ * earnings are spendable; pending/reserved/completed withdrawals reduce it.
+ * Wallet top-ups remain pending until an admin manually credits the user,
+ * exactly as the manual settlement workflow requires.
+ */
+export async function getWalletAvailableBalanceKobo(userId: string): Promise<number> {
+  const [credits, withdrawals] = await Promise.all([
+    db.ledgerEntry.aggregate({
+      where: {
+        userId,
+        type: { in: [LedgerEntryType.ADMIN_CREDIT, LedgerEntryType.PROVIDER_EARNING_AVAILABLE] },
+        status: LedgerEntryStatus.AVAILABLE,
+      },
+      _sum: { amountKobo: true },
+    }),
+    db.ledgerEntry.aggregate({
+      where: {
+        userId,
+        type: {
+          in: [LedgerEntryType.WITHDRAWAL_REQUESTED, LedgerEntryType.WITHDRAWAL_COMPLETED, LedgerEntryType.ADMIN_DEBIT],
+        },
+        status: { in: [LedgerEntryStatus.PENDING, LedgerEntryStatus.RESERVED, LedgerEntryStatus.RELEASED] },
+      },
+      _sum: { amountKobo: true },
+    }),
+  ]);
+  return Math.max(0, (credits._sum.amountKobo ?? 0) - (withdrawals._sum.amountKobo ?? 0));
+}
