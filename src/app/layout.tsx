@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { getCurrentUser } from "@/lib/auth";
 import Link from "next/link";
-import { Compass, LayoutGrid, Sparkles, Zap, ShieldCheck } from "lucide-react";
+import { Compass, LayoutGrid, Sparkles, Zap } from "lucide-react";
 import NotificationBell from "@/components/notification-bell";
 
 export const metadata: Metadata = {
@@ -37,11 +37,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               {user?.isProvider && (
                 <Link href="/provider/dashboard" className="flex items-center gap-1.5 text-[var(--ink-soft)] hover:text-brass transition-colors">
                   <LayoutGrid size={16} /> Provider dashboard
-                </Link>
-              )}
-              {user?.isAdmin && (
-                <Link href="/admin/listings" className="flex items-center gap-1.5 text-[var(--ink-soft)] hover:text-brass transition-colors">
-                  <ShieldCheck size={16} /> Review queue
                 </Link>
               )}
             </nav>

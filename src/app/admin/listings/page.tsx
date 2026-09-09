@@ -1,7 +1,8 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import ListingReviewQueue from "./review-queue";
+
+// Auth is enforced one level up in src/app/admin/layout.tsx — every route
+// nested under /admin already requires a valid admin-console session.
 
 function naira(kobo: number | null): string {
   if (kobo == null) return "—";
@@ -9,10 +10,6 @@ function naira(kobo: number | null): string {
 }
 
 export default async function AdminListingsPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  if (!user.isAdmin) redirect("/dashboard");
-
   const pending = await db.listing.findMany({
     where: { status: "PENDING_REVIEW" },
     include: {
@@ -26,11 +23,12 @@ export default async function AdminListingsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl px-5 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight">Listing review queue</h1>
-      <p className="mt-1 text-sm text-[var(--ink-soft)]">
+    <div className="max-w-4xl">
+      <h1 className="text-2xl font-semibold tracking-tight">Pending reviews</h1>
+      <p className="mt-1 text-sm text-white/50">
         Providers submit listings as &quot;pending review&quot;. Nothing appears in
-        search until it&apos;s approved here.
+        search until you approve it here — this is the ONLY gate before a
+        listing goes live.
       </p>
 
       <ListingReviewQueue

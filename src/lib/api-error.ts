@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { UnauthorizedError, ForbiddenError } from "@/lib/auth";
+import { AdminUnauthorizedError } from "@/lib/admin-auth";
 
 /**
  * Central error → HTTP response mapping. Never leaks raw error messages
@@ -14,6 +15,9 @@ export function handleApiError(err: unknown): NextResponse {
   }
   if (err instanceof ForbiddenError) {
     return NextResponse.json({ error: err.message }, { status: 403 });
+  }
+  if (err instanceof AdminUnauthorizedError) {
+    return NextResponse.json({ error: err.message }, { status: 401 });
   }
   if (err instanceof ZodError) {
     return NextResponse.json(

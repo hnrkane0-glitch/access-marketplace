@@ -88,3 +88,76 @@ export async function releaseDuePayouts(): Promise<{ released: number; skipped: 
 
   return { released, skipped };
 }
+
+/**
+ * Admin override: release a specific payout right now, regardless of its
+ * `availableAt` hold window — and clears a dispute hold if present. Used
+ * by the admin console's "release now" action (ARCHITECTURE.md §1 item
+ * 10: "Admin: view transactions, disputes, override/release payouts").
+ * Every use is written to AuditLog since it's a manual override of the
+ * normal state machine.
+ */
+export async function forceReleasePayout(payoutId: string, reason: string): Promise<void> {
+  await db.$transaction(async (tx) => {
+    const payout = await tx.payout.findUniqueOrThrow({ where: { id: payoutId } });
+    if (payout.releasedAt) throw new Error("Payout already released.");
+
+    const pendingEntry = await tx.ledgerEntry.findFirst({
+      where: {
+        bookingId: payout.bookingId,
+        type: LedgerEntryType.PROVIDER_EARNING_PENDING,
+        status: LedgerEntryStatus.RESERVED,
+      },
+    });
+    if (!pendingEntry) throw new Error("No pending earning entry found for this payout.");
+
+    await tx.ledgerEntry.update({
+      where: { id: pendingEntry.id },
+      data: { status: LedgerEntryStatus.RELEASED },
+    });
+
+    await tx.ledgerEntry.create({
+      data: {
+        bookingId: payout.bookingId,
+        userId: pendingEntry.userId,
+        type: LedgerEntryType.PROVIDER_EARNING_AVAILABLE,
+        direction: "CREDIT",
+        amountKobo: pendingEntry.amountKobo,
+        status: LedgerEntryStatus.AVAILABLE,
+      },
+    });
+
+    await tx.payout.update({
+      where: { id: payoutId },
+      data: { releasedAt: new Date(), holdReason: null },
+    });
+
+    await transitionBooking(tx, {
+      bookingId: payout.bookingId,
+      to: "PAYOUT_RELEASED",
+      actorId: null,
+      reason: `Admin override: ${reason}`,
+    }).catch(() => {
+      // Booking may already be past PAYOUT_RELEASED in an edge case —
+      // the ledger + payout rows above are the source of truth either way.
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: null,
+        action: "PAYOUT_FORCE_RELEASED",
+        toValue: payoutId,
+        metadata: { via: "admin-console", reason },
+      },
+    });
+
+    await tx.notification.create({
+      data: {
+        userId: pendingEntry.userId,
+        type: "PAYOUT_RELEASED",
+        title: "Funds available",
+        body: `₦${(pendingEntry.amountKobo / 100).toLocaleString()} was released early by an admin and is now available to withdraw.`,
+      },
+    });
+  });
+}

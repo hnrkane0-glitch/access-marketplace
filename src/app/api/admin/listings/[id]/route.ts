@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminSession } from "@/lib/admin-auth";
 import { handleApiError, userError } from "@/lib/api-error";
 import { ListingStatus } from "@prisma/client";
 
@@ -23,7 +23,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await requireAdmin();
+    await requireAdminSession();
     const { id } = await params;
     const { action, reason } = DecisionSchema.parse(await req.json());
 
@@ -45,11 +45,11 @@ export async function PATCH(
 
       await tx.auditLog.create({
         data: {
-          actorId: admin.id,
+          actorId: null,
           action: `LISTING_${action.toUpperCase()}`,
           fromValue: listing.status,
           toValue: nextStatus,
-          metadata: reason ? { reason } : undefined,
+          metadata: { via: "admin-console", ...(reason ? { reason } : {}) },
         },
       });
 

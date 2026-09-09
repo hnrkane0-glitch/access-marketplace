@@ -23,6 +23,11 @@ payment provider (Paystack):
 8. Ledger: every money movement is an explicit, immutable entry.
 9. Configurable payout hold window; provider sees "available in N days."
 10. Admin: view transactions, disputes, override/release payouts.
+11. A separate admin console (`/admin-login`, guarded routes under `/admin`)
+    authenticated by a single username/password pair from the environment
+    (`ADMIN_USERNAME` / `ADMIN_PASSWORD`, defaults `admin` / `password`) —
+    intentionally NOT tied to the `User` table, so no renter or provider
+    account can ever reach it. See `src/lib/admin-auth.ts`.
 
 Explicitly **out of scope for Phase 1** (stubbed with clear extension
 points): packages, multi-provider checkout, QR check-in hardware flow,

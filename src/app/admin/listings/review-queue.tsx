@@ -44,7 +44,7 @@ export default function ListingReviewQueue({
 
   if (listings.length === 0) {
     return (
-      <div className="mt-8 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--paper-raised)] p-8 text-center text-sm text-[var(--ink-soft)]">
+      <div className="mt-8 rounded-2xl border border-dashed border-white/15 bg-white/5 p-8 text-center text-sm text-white/50">
         Nothing waiting for review right now.
       </div>
     );
@@ -60,9 +60,9 @@ export default function ListingReviewQueue({
       {listings.map((l) => (
         <div
           key={l.id}
-          className="flex gap-4 rounded-2xl border border-[var(--line)] bg-[var(--paper-raised)] p-5 card-shadow"
+          className="flex gap-4 rounded-2xl border border-white/10 bg-white/5 p-5"
         >
-          <div className="w-20 h-20 rounded-lg overflow-hidden shrink-0 bg-[var(--line)]">
+          <div className="w-20 h-20 rounded-lg overflow-hidden shrink-0 bg-white/10">
             {l.thumbnail ? (
               // eslint-disable-next-line @next/next/no-img-element -- provider-supplied media
               <img src={l.thumbnail} alt="" className="w-full h-full object-cover" />
@@ -70,12 +70,12 @@ export default function ListingReviewQueue({
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium">{l.title}</p>
-            <p className="text-sm text-[var(--ink-soft)]">
+            <p className="text-sm text-white/50">
               {l.category} · {l.area ? `${l.area}, ` : ""}
               {l.city} · {l.priceLabel}
             </p>
-            <p className="text-sm text-[var(--ink-soft)] mt-1 line-clamp-2">{l.description}</p>
-            <p className="text-xs text-[var(--ink-soft)] mt-2">
+            <p className="text-sm text-white/50 mt-1 line-clamp-2">{l.description}</p>
+            <p className="text-xs text-white/40 mt-2">
               By {l.provider.fullName} ({l.provider.email})
             </p>
             <div className="mt-3 flex gap-2">
@@ -92,7 +92,7 @@ export default function ListingReviewQueue({
                 type="button"
                 disabled={busyId === l.id}
                 onClick={() => decide(l.id, "reject")}
-                className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-[var(--line)] hover:border-rust hover:text-rust disabled:opacity-50"
+                className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-white/15 hover:border-rust hover:text-rust disabled:opacity-50"
               >
                 <X size={14} /> Reject
               </button>
@@ -100,7 +100,7 @@ export default function ListingReviewQueue({
                 type="button"
                 disabled={busyId === l.id}
                 onClick={() => decide(l.id, "suspend")}
-                className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-[var(--line)] hover:border-amber-500 hover:text-amber-600 disabled:opacity-50"
+                className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-white/15 hover:border-amber-500 hover:text-amber-400 disabled:opacity-50"
               >
                 <PauseCircle size={14} /> Suspend
               </button>

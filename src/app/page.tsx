@@ -83,83 +83,112 @@ const STATS = [
 export default function HomePage() {
   return (
     <div className="overflow-x-hidden">
-      {/* HERO */}
-      <section className="relative">
+      {/* HERO — futuristic dark */}
+      <section className="relative bg-[#05060f] text-white">
         <div
           aria-hidden
-          className="absolute inset-0 -z-10 bg-grad-brand opacity-[0.06]"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(109,61,240,0.14) 1px, transparent 1px), linear-gradient(90deg, rgba(109,61,240,0.14) 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+            maskImage: "radial-gradient(ellipse 80% 60% at 50% 20%, black 30%, transparent 85%)",
+          }}
         />
-        <div className="mx-auto max-w-6xl px-5 pt-14 pb-10">
-          <div className="grid md:grid-cols-[1.3fr_1fr] rounded-3xl overflow-hidden border border-[var(--line)] card-shadow">
-            <div className="bg-[var(--paper-raised)] p-8 sm:p-12">
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide px-3 py-1 rounded-full bg-violet-100 text-violet-700">
-                <Zap size={12} fill="currentColor" /> Live across Nigeria
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-56 left-1/4 w-[600px] h-[600px] rounded-full blur-3xl opacity-40"
+          style={{ background: "radial-gradient(circle, #6d3df0 0%, transparent 65%)" }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-40 right-0 w-[500px] h-[500px] rounded-full blur-3xl opacity-30"
+          style={{ background: "radial-gradient(circle, #ff4d8d 0%, transparent 65%)" }}
+        />
+
+        <div className="relative mx-auto max-w-6xl px-5 pt-16 pb-10">
+          <div className="grid md:grid-cols-[1.3fr_1fr] gap-6">
+            <div>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide px-3 py-1 rounded-full border border-brass/40 bg-brass/10 text-violet-200">
+                <Zap size={12} fill="currentColor" /> Live across Nigeria &middot; next-gen access
               </span>
-              <h1 className="mt-4 text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.05] max-w-md">
-                Find what you need.{" "}
-                <span className="text-gradient">Access it</span> when you need it.
+              <h1 className="mt-5 text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.02] max-w-xl">
+                Don&apos;t own it.{" "}
+                <span
+                  className="bg-clip-text text-transparent"
+                  style={{ backgroundImage: "linear-gradient(135deg, #a78bfa 0%, #818cf8 45%, #ff7ab5 100%)" }}
+                >
+                  Access it.
+                </span>
               </h1>
-              <p className="mt-4 text-[var(--ink-soft)] max-w-sm">
-                Studios, kitchens, equipment, skills and unused capacity —
-                booked by the hour, secured by real payment protection.
+              <p className="mt-4 text-white/60 max-w-md text-lg">
+                Studios, kitchens, equipment, skills, and unused capacity — unlocked by the hour.
+                Every payment protected. Every listing verified. No waiting rooms.
               </p>
 
               <form action="/search" className="mt-8 space-y-3 max-w-md">
-                <label className="block text-sm font-medium" htmlFor="q">
-                  What do you need access to?
-                </label>
-                <div className="relative">
-                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
-                  <input
-                    id="q"
-                    name="q"
-                    placeholder="e.g. photography studio in Lekki"
-                    className="w-full rounded-xl border border-[var(--line)] bg-white pl-11 pr-4 py-3 text-base focus:border-brass focus:ring-2 focus:ring-brass/20 outline-none transition-shadow"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    name="city"
-                    placeholder="Location"
-                    className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm focus:border-brass focus:ring-2 focus:ring-brass/20 outline-none transition-shadow"
-                  />
-                  <input
-                    name="date"
-                    type="date"
-                    className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm focus:border-brass focus:ring-2 focus:ring-brass/20 outline-none transition-shadow"
-                  />
+                <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur-xl p-1.5 shadow-[0_0_50px_-15px_rgba(109,61,240,0.6)]">
+                  <div className="relative">
+                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+                    <input
+                      id="q"
+                      name="q"
+                      placeholder="e.g. photography studio in Lekki"
+                      className="w-full rounded-xl bg-transparent pl-11 pr-4 py-3 text-base outline-none placeholder:text-white/30"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 px-1.5 pb-1.5">
+                    <input
+                      name="city"
+                      placeholder="Location"
+                      className="rounded-xl bg-black/30 border border-white/10 px-4 py-2.5 text-sm outline-none placeholder:text-white/30 focus:border-brass transition-colors"
+                    />
+                    <input
+                      name="date"
+                      type="date"
+                      className="rounded-xl bg-black/30 border border-white/10 px-4 py-2.5 text-sm outline-none text-white/70 focus:border-brass transition-colors [color-scheme:dark]"
+                    />
+                  </div>
                 </div>
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-grad-brand text-white font-medium py-3 hover:opacity-90 transition-opacity pop-shadow flex items-center justify-center gap-2"
+                  className="w-full rounded-xl bg-grad-brand text-white font-semibold py-3.5 hover:opacity-90 transition-opacity shadow-[0_0_35px_-8px_rgba(109,61,240,0.9)] flex items-center justify-center gap-2"
                 >
-                  Search <ArrowRight size={16} />
+                  Search access <ArrowRight size={16} />
                 </button>
               </form>
+
+              <div className="mt-5 flex items-center gap-4 text-xs text-white/40">
+                <span className="flex items-center gap-1.5"><ShieldCheck size={13} className="text-emerald-400" /> Escrow-protected</span>
+                <span className="flex items-center gap-1.5"><Zap size={13} className="text-amber-300" /> Instant-book available</span>
+              </div>
             </div>
 
-            {/* the pass */}
-            <div className="relative bg-grad-dark text-white p-8 sm:p-10 flex flex-col justify-between perforated ticket-notch">
-              <div>
-                <p className="text-xs uppercase tracking-[0.15em] text-orange-300 font-mono flex items-center gap-1.5">
+            {/* the pass — holographic ticket */}
+            <div className="relative rounded-3xl overflow-hidden border border-white/15 bg-gradient-to-b from-white/10 to-white/[0.03] backdrop-blur-xl p-8 flex flex-col justify-between perforated ticket-notch shadow-[0_0_60px_-20px_rgba(109,61,240,0.7)]">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -inset-1 opacity-50"
+                style={{ background: "linear-gradient(135deg, rgba(109,61,240,0.25), transparent 40%, rgba(255,77,141,0.2))" }}
+              />
+              <div className="relative">
+                <p className="text-xs uppercase tracking-[0.2em] text-orange-300 font-mono flex items-center gap-1.5">
                   <Zap size={12} fill="currentColor" /> Access Pass
                 </p>
-                <p className="mt-3 text-2xl font-semibold leading-tight">
-                  Commercial kitchen
-                </p>
-                <p className="text-sm text-white/60">Yaba, Lagos · 2pm – 5pm</p>
+                <p className="mt-3 text-2xl font-semibold leading-tight">Commercial kitchen</p>
+                <p className="text-sm text-white/50">Yaba, Lagos &middot; 2pm – 5pm</p>
               </div>
 
-              <dl className="mt-8 grid grid-cols-2 gap-y-3 text-sm">
+              <dl className="relative mt-8 grid grid-cols-2 gap-y-3 text-sm">
                 <dt className="text-white/50 flex items-center gap-1.5"><ShieldCheck size={14} /> Provider</dt>
-                <dd className="text-right font-mono">Verified</dd>
+                <dd className="text-right font-mono text-violet-200">Verified</dd>
                 <dt className="text-white/50 flex items-center gap-1.5"><Wallet size={14} /> Payment</dt>
-                <dd className="text-right font-mono">Protected</dd>
+                <dd className="text-right font-mono text-violet-200">Protected</dd>
                 <dt className="text-white/50">Deposit</dt>
-                <dd className="text-right font-mono">Held</dd>
+                <dd className="text-right font-mono text-violet-200">Held</dd>
               </dl>
 
-              <div className="mt-8 pt-6 border-t border-dashed border-white/25 flex items-end justify-between">
+              <div className="relative mt-8 pt-6 border-t border-dashed border-white/20 flex items-end justify-between">
                 <div>
                   <p className="text-xs text-white/50">Access code</p>
                   <p className="text-2xl font-mono tracking-widest text-orange-300">583921</p>
@@ -172,16 +201,25 @@ export default function HomePage() {
           </div>
 
           {/* stat strip */}
-          <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4">
             {STATS.map((s) => (
-              <div key={s.label} className="rounded-2xl border border-[var(--line)] bg-[var(--paper-raised)] p-4 text-center card-shadow">
-                <p className="text-xl sm:text-2xl font-semibold text-gradient">{s.value}</p>
-                <p className="text-xs text-[var(--ink-soft)] mt-1">{s.label}</p>
+              <div key={s.label} className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 text-center">
+                <p
+                  className="text-xl sm:text-2xl font-semibold bg-clip-text text-transparent"
+                  style={{ backgroundImage: "linear-gradient(135deg, #a78bfa, #818cf8)" }}
+                >
+                  {s.value}
+                </p>
+                <p className="text-xs text-white/40 mt-1">{s.label}</p>
               </div>
             ))}
           </div>
         </div>
+
+        {/* fade into light content below */}
+        <div className="h-16 bg-gradient-to-b from-transparent to-[var(--paper)]" />
       </section>
+
 
       {/* PURPOSE-FIRST DISCOVERY */}
       <section className="mx-auto max-w-6xl px-5 py-10">

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminSession } from "@/lib/admin-auth";
 import { handleApiError } from "@/lib/api-error";
 import { ListingStatus } from "@prisma/client";
 
@@ -15,7 +15,7 @@ import { ListingStatus } from "@prisma/client";
  */
 export async function GET(req: NextRequest) {
   try {
-    await requireAdmin();
+    await requireAdminSession();
     const sp = req.nextUrl.searchParams;
     const statusParam = sp.get("status")?.toUpperCase();
     const status =

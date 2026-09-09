@@ -496,6 +496,8 @@ enum LedgerEntryType {
   WITHDRAWAL_COMPLETED
   DISPUTE_HOLD
   REFUND_DEDUCTION
+  ADMIN_CREDIT
+  ADMIN_DEBIT
 }
 
 enum LedgerDirection {
