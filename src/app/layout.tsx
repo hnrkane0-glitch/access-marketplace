@@ -44,17 +44,19 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <div className="flex items-center gap-3 text-sm">
               {user && <NotificationBell />}
               {user ? (
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--line)] font-medium hover:border-brass hover:text-brass transition-colors"
-                >
-                  <span className="w-6 h-6 rounded-full bg-grad-brand text-white text-xs font-semibold flex items-center justify-center">
-                    {user.fullName.charAt(0).toUpperCase()}
-                  </span>
-                  {user.fullName.split(" ")[0]}
-                </Link>
-                <Link href="/settings" className="text-[var(--ink-soft)] hover:text-brass" title="Membership & billing"><Settings size={16}/></Link>
-                <Link href="/logout" className="text-[var(--ink-soft)] hover:text-rust" title="Log out"><LogOut size={16}/></Link>
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--line)] font-medium hover:border-brass hover:text-brass transition-colors"
+                  >
+                    <span className="w-6 h-6 rounded-full bg-grad-brand text-white text-xs font-semibold flex items-center justify-center">
+                      {user.fullName.charAt(0).toUpperCase()}
+                    </span>
+                    {user.fullName.split(" ")[0]}
+                  </Link>
+                  <Link href="/settings" className="text-[var(--ink-soft)] hover:text-brass" title="Membership & billing"><Settings size={16}/></Link>
+                  <Link href="/logout" className="text-[var(--ink-soft)] hover:text-rust" title="Log out"><LogOut size={16}/></Link>
+                </>
               ) : (
                 <>
                   <Link href="/login" className="hover:text-brass transition-colors font-medium">
