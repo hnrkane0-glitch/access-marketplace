@@ -166,6 +166,50 @@ export async function getProviderPendingBalanceKobo(providerId: string): Promise
   return pending._sum.amountKobo ?? 0;
 }
 
+/**
+ * A user's manual top-up wallet balance — completely separate from
+ * provider marketplace earnings (getProviderAvailableBalanceKobo above).
+ * Funded only by an admin ADMIN_CREDIT entry (posted from /admin/send-money
+ * once they've confirmed a Paystack top-up payment) and spent down by
+ * ADMIN_DEBIT or a wallet withdrawal request. Available to any user,
+ * provider or renter — a renter with no marketplace earnings can still
+ * hold and withdraw a wallet balance.
+ */
+export async function getWalletBalanceKobo(userId: string): Promise<number> {
+  const [credited, debited, withdrawing] = await Promise.all([
+    db.ledgerEntry.aggregate({
+      where: {
+        userId,
+        type: LedgerEntryType.ADMIN_CREDIT,
+        status: LedgerEntryStatus.AVAILABLE,
+      },
+      _sum: { amountKobo: true },
+    }),
+    db.ledgerEntry.aggregate({
+      where: {
+        userId,
+        type: LedgerEntryType.ADMIN_DEBIT,
+        status: LedgerEntryStatus.AVAILABLE,
+      },
+      _sum: { amountKobo: true },
+    }),
+    db.ledgerEntry.aggregate({
+      where: {
+        userId,
+        type: LedgerEntryType.WALLET_WITHDRAWAL_REQUESTED,
+        status: { in: [LedgerEntryStatus.PENDING, LedgerEntryStatus.RESERVED] },
+      },
+      _sum: { amountKobo: true },
+    }),
+  ]);
+
+  return (
+    (credited._sum.amountKobo ?? 0) -
+    (debited._sum.amountKobo ?? 0) -
+    (withdrawing._sum.amountKobo ?? 0)
+  );
+}
+
 export async function getCustomerReservedDepositsKobo(customerId: string): Promise<number> {
   const held = await db.ledgerEntry.aggregate({
     where: {
@@ -176,35 +220,4 @@ export async function getCustomerReservedDepositsKobo(customerId: string): Promi
     _sum: { amountKobo: true },
   });
   return held._sum.amountKobo ?? 0;
-}
-
-
-/**
- * General spendable wallet balance. Admin credits and released provider
- * earnings are spendable; pending/reserved/completed withdrawals reduce it.
- * Wallet top-ups remain pending until an admin manually credits the user,
- * exactly as the manual settlement workflow requires.
- */
-export async function getWalletAvailableBalanceKobo(userId: string): Promise<number> {
-  const [credits, withdrawals] = await Promise.all([
-    db.ledgerEntry.aggregate({
-      where: {
-        userId,
-        type: { in: [LedgerEntryType.ADMIN_CREDIT, LedgerEntryType.PROVIDER_EARNING_AVAILABLE] },
-        status: LedgerEntryStatus.AVAILABLE,
-      },
-      _sum: { amountKobo: true },
-    }),
-    db.ledgerEntry.aggregate({
-      where: {
-        userId,
-        type: {
-          in: [LedgerEntryType.WITHDRAWAL_REQUESTED, LedgerEntryType.WITHDRAWAL_COMPLETED, LedgerEntryType.ADMIN_DEBIT],
-        },
-        status: { in: [LedgerEntryStatus.PENDING, LedgerEntryStatus.RESERVED, LedgerEntryStatus.RELEASED] },
-      },
-      _sum: { amountKobo: true },
-    }),
-  ]);
-  return Math.max(0, (credits._sum.amountKobo ?? 0) - (withdrawals._sum.amountKobo ?? 0));
 }

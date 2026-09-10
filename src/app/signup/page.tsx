@@ -30,7 +30,7 @@ export default function SignupPage() {
         method: "POST",
         body: JSON.stringify({ fullName, email, password }),
       });
-      router.push("/plans");
+      router.push("/packages");
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong.");

@@ -9,10 +9,11 @@ interface Row {
   name: string;
   email: string;
   amountKobo: number;
+  bankName: string | null;
   bankCode: string;
-  bankName: string;
-  accountName: string;
   accountNumber: string;
+  accountName: string | null;
+  source: string;
   requestedAt: string;
   status: string;
 }
@@ -55,6 +56,7 @@ export default function WithdrawalTable({ rows: initialRows }: { rows: Row[] }) 
           <thead>
             <tr className="text-left text-xs text-white/40 uppercase tracking-wide border-b border-white/10">
               <th className="px-4 py-3 font-medium">Requested by</th>
+              <th className="px-4 py-3 font-medium">Source</th>
               <th className="px-4 py-3 font-medium">Amount</th>
               <th className="px-4 py-3 font-medium">Bank details</th>
               <th className="px-4 py-3 font-medium">Requested</th>
@@ -68,9 +70,19 @@ export default function WithdrawalTable({ rows: initialRows }: { rows: Row[] }) 
                   <p className="font-medium">{r.name}</p>
                   <p className="text-xs text-white/40">{r.email}</p>
                 </td>
+                <td className="px-4 py-3 text-xs">
+                  <span
+                    className={`inline-block rounded-full px-2 py-0.5 ${
+                      r.source === "WALLET" ? "bg-brass/20 text-brass" : "bg-emerald-600/20 text-emerald-400"
+                    }`}
+                  >
+                    {r.source === "WALLET" ? "Wallet" : "Provider earnings"}
+                  </span>
+                </td>
                 <td className="px-4 py-3 font-medium">{naira(r.amountKobo)}</td>
                 <td className="px-4 py-3 text-xs text-white/50">
-                  {r.bankName} ({r.bankCode}) · {r.accountName} · {r.accountNumber}
+                  <p>{r.bankName ?? r.bankCode} &middot; {r.accountNumber}</p>
+                  {r.accountName && <p className="text-white/30">{r.accountName}</p>}
                 </td>
                 <td className="px-4 py-3 text-xs text-white/40">{new Date(r.requestedAt).toLocaleString()}</td>
                 <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">

@@ -16,8 +16,6 @@ interface InitializeTransactionParams {
   reference: string;
   callbackUrl: string;
   metadata?: Record<string, unknown>;
-  planCode?: string;
-  channels?: string[];
 }
 
 interface InitializeTransactionResult {
@@ -46,8 +44,6 @@ export async function initializeTransaction(
       reference: params.reference,
       callback_url: params.callbackUrl,
       metadata: params.metadata ?? {},
-      ...(params.planCode ? { plan: params.planCode } : {}),
-      ...(params.channels ? { channels: params.channels } : {}),
     }),
   });
 
@@ -86,10 +82,129 @@ export async function verifyTransaction(reference: string) {
     amount: number;
     currency: string;
     metadata: Record<string, unknown>;
-    customer?: { customer_code?: string };
-    authorization?: { authorization_code?: string; channel?: string; reusable?: boolean };
     id: number; // Paystack's numeric transaction id — used as the idempotency key
+    plan: string | null;
+    customer: { customer_code: string; email: string };
+    authorization: {
+      authorization_code: string;
+      last4: string;
+      exp_month: string;
+      exp_year: string;
+      card_type: string;
+      bank: string;
+      reusable: boolean;
+    };
   };
+}
+
+/** Looks up a plan's configured price/interval from Paystack — used so we
+ * never hardcode Starter/Eternal/Pro prices in this codebase; the
+ * Paystack dashboard is the single source of truth for pricing. */
+export async function fetchPlan(planCode: string): Promise<{
+  amountKobo: number;
+  interval: string;
+  name: string;
+}> {
+  const res = await fetch(`${PAYSTACK_BASE_URL}/plan/${encodeURIComponent(planCode)}`, {
+    headers: { Authorization: `Bearer ${requireSecretKey()}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.status) {
+    throw new Error(`Paystack fetch-plan failed for ${planCode}: ${json.message ?? res.statusText}`);
+  }
+  return {
+    amountKobo: json.data.amount,
+    interval: json.data.interval,
+    name: json.data.name,
+  };
+}
+
+interface CreateSubscriptionParams {
+  customerEmailOrCode: string;
+  planCode: string;
+  authorizationCode: string;
+  /** ISO string — delays the first recurring charge to this date. Omit
+   * to bill immediately (used for Eternal/Pro, which don't have a trial). */
+  startDate?: string;
+}
+
+interface CreateSubscriptionResult {
+  subscriptionCode: string;
+  emailToken: string;
+}
+
+/**
+ * Creates a Paystack subscription against an already-tokenized card
+ * (from a prior transaction's `authorization.authorization_code`).
+ * Passing `startDate` in the future is how the Starter package's 7-day
+ * free trial works — the card is verified now, but Paystack doesn't
+ * attempt its first real charge until then.
+ * Docs: https://paystack.com/docs/payments/subscriptions/
+ */
+export async function createSubscription(
+  params: CreateSubscriptionParams
+): Promise<CreateSubscriptionResult> {
+  const res = await fetch(`${PAYSTACK_BASE_URL}/subscription`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requireSecretKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      customer: params.customerEmailOrCode,
+      plan: params.planCode,
+      authorization: params.authorizationCode,
+      ...(params.startDate ? { start_date: params.startDate } : {}),
+    }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.status) {
+    throw new Error(`Paystack create-subscription failed: ${json.message ?? res.statusText}`);
+  }
+  return {
+    subscriptionCode: json.data.subscription_code,
+    emailToken: json.data.email_token,
+  };
+}
+
+/**
+ * Refunds a transaction. Used only for the Starter trial's small
+ * card-verification charge (Paystack has no true ₦0 auth in NGN) — we
+ * charge a small amount to tokenize the card, then immediately refund it
+ * so the trial is genuinely free.
+ */
+export async function refundTransaction(reference: string): Promise<void> {
+  const res = await fetch(`${PAYSTACK_BASE_URL}/refund`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requireSecretKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ transaction: reference }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.status) {
+    throw new Error(`Paystack refund failed: ${json.message ?? res.statusText}`);
+  }
+}
+
+/** Cancels a subscription. `emailToken` comes from createSubscription's result. */
+export async function disableSubscription(params: {
+  subscriptionCode: string;
+  emailToken: string;
+}): Promise<void> {
+  const res = await fetch(`${PAYSTACK_BASE_URL}/subscription/disable`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requireSecretKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ code: params.subscriptionCode, token: params.emailToken }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.status) {
+    throw new Error(`Paystack disable-subscription failed: ${json.message ?? res.statusText}`);
+  }
 }
 
 /**
@@ -109,45 +224,4 @@ export function verifyWebhookSignature(rawBody: string, signatureHeader: string 
   const b = Buffer.from(signatureHeader, "utf8");
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
-}
-
-
-export async function refundTransaction(reference: string, amountKobo?: number) {
-  const body: Record<string, unknown> = { transaction: reference };
-  if (amountKobo) body.amount = amountKobo;
-  const res = await fetch(`${PAYSTACK_BASE_URL}/refund`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${requireSecretKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json();
-  if (!res.ok || !json.status) throw new Error(`Paystack refund failed: ${json.message ?? res.statusText}`);
-  return json.data;
-}
-
-export async function createSubscription(params: {
-  customerCode: string;
-  planCode: string;
-  authorizationCode: string;
-  startDate?: string;
-}) {
-  const res = await fetch(`${PAYSTACK_BASE_URL}/subscription`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${requireSecretKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      customer: params.customerCode,
-      plan: params.planCode,
-      authorization: params.authorizationCode,
-      ...(params.startDate ? { start_date: params.startDate } : {}),
-    }),
-  });
-  const json = await res.json();
-  if (!res.ok || !json.status) throw new Error(`Paystack subscription failed: ${json.message ?? res.statusText}`);
-  return json.data as { subscription_code: string; email_token: string; status: string };
 }

@@ -26,10 +26,24 @@ export async function PATCH(
     }
 
     await db.$transaction(async (tx) => {
+      const isWallet = withdrawal.source === "WALLET";
+      const requestedType = isWallet
+        ? LedgerEntryType.WALLET_WITHDRAWAL_REQUESTED
+        : LedgerEntryType.WITHDRAWAL_REQUESTED;
+      const completedType = isWallet
+        ? LedgerEntryType.WALLET_WITHDRAWAL_COMPLETED
+        : LedgerEntryType.WITHDRAWAL_COMPLETED;
+      // Reversal on failure restores the money to the balance it came
+      // from — a provider's marketplace earnings, or a wallet top-up
+      // balance — never crossing the two.
+      const reversalCreditType = isWallet
+        ? LedgerEntryType.ADMIN_CREDIT
+        : LedgerEntryType.PROVIDER_EARNING_AVAILABLE;
+
       const reservedEntry = await tx.ledgerEntry.findFirst({
         where: {
           userId: withdrawal.userId,
-          type: LedgerEntryType.WITHDRAWAL_REQUESTED,
+          type: requestedType,
           amountKobo: withdrawal.amountKobo,
           status: LedgerEntryStatus.RESERVED,
         },
@@ -46,7 +60,7 @@ export async function PATCH(
         await tx.ledgerEntry.create({
           data: {
             userId: withdrawal.userId,
-            type: LedgerEntryType.WITHDRAWAL_COMPLETED,
+            type: completedType,
             direction: "DEBIT",
             amountKobo: withdrawal.amountKobo,
             status: LedgerEntryStatus.RELEASED,
@@ -73,7 +87,7 @@ export async function PATCH(
           await tx.ledgerEntry.create({
             data: {
               userId: withdrawal.userId,
-              type: LedgerEntryType.ADMIN_CREDIT,
+              type: reversalCreditType,
               direction: "CREDIT",
               amountKobo: withdrawal.amountKobo,
               status: LedgerEntryStatus.AVAILABLE,

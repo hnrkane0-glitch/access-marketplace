@@ -54,10 +54,8 @@ model User {
   auditLogsActed    AuditLog[]          @relation("AuditActor")
   sessions          Session[]
   withdrawals       Withdrawal[]
-  walletTopups      WalletTopup[]
-  accountSubscriptions AccountSubscription[]
-  chatParticipants  ChatParticipant[]
-  chatMessagesSent  ChatMessage[]
+  walletTopUps      Payment[]           @relation("WalletTopupPayments")
+  subscription      Subscription?
 
   @@index([email])
 }
@@ -138,20 +136,49 @@ model ProviderProfile {
   verificationLevel  VerificationLevel @default(UNVERIFIED)
   commissionOverride Int?     // basis points; null = use platform default
   payoutBankCode     String?
-  payoutBankName     String?
   payoutAccountNumber String?
   payoutAccountName  String?
   payoutInfoUpdatedAt DateTime?
-  subscriptionTier   SubscriptionTier @default(FREE)
   createdAt          DateTime @default(now())
 
   @@index([userId])
 }
 
 enum SubscriptionTier {
-  FREE
+  STARTER
+  ETERNAL
   PRO
-  BUSINESS
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+// One row per user who has been through the paid signup flow. Both
+// providers and renters go through package selection at signup, so this
+// hangs off User, not ProviderProfile. See ARCHITECTURE.md addendum §12.
+model Subscription {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  user                   User     @relation(fields: [userId], references: [id])
+  tier                   SubscriptionTier
+  status                 SubscriptionStatus @default(TRIALING)
+  paystackPlanCode       String
+  paystackCustomerCode   String?
+  paystackSubscriptionCode String?
+  paystackEmailToken     String? // required alongside subscriptionCode to disable/cancel via Paystack
+  paystackAuthorizationCode String? // tokenized card, for the auto-charge after trial
+  trialEndsAt            DateTime?
+  currentPeriodEnd       DateTime?
+  cancelledAt            DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -430,20 +457,35 @@ enum ConditionStage {
 
 model Payment {
   id                String   @id @default(cuid())
+  // Nullable because wallet top-ups (PaymentPurpose.WALLET_TOPUP) aren't
+  // attached to a booking — they're a user funding their own wallet
+  // balance, credited manually by an admin after the fact. See §11 in
+  // ARCHITECTURE.md addendum below.
   bookingId         String?
-  booking           Booking?  @relation(fields: [bookingId], references: [id])
+  booking           Booking? @relation(fields: [bookingId], references: [id])
+  // Set only for WALLET_TOPUP payments — who is topping up. Booking
+  // payments identify the payer via booking.customerId instead.
+  userId            String?
+  user              User?    @relation("WalletTopupPayments", fields: [userId], references: [id])
+  purpose           PaymentPurpose @default(BOOKING)
   provider          String   @default("paystack")
   providerReference String   @unique // Paystack transaction reference
   amountKobo        Int
   status            PaymentStatus @default(INITIATED)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  metadata          Json?
 
   events            PaymentEvent[]
 
   @@index([bookingId])
   @@index([providerReference])
+  @@index([userId])
+}
+
+enum PaymentPurpose {
+  BOOKING
+  WALLET_TOPUP
+  SUBSCRIPTION
 }
 
 enum PaymentStatus {
@@ -504,7 +546,8 @@ enum LedgerEntryType {
   REFUND_DEDUCTION
   ADMIN_CREDIT
   ADMIN_DEBIT
-  WALLET_TOPUP
+  WALLET_WITHDRAWAL_REQUESTED
+  WALLET_WITHDRAWAL_COMPLETED
 }
 
 enum LedgerDirection {
@@ -564,6 +607,11 @@ model Withdrawal {
   user         User     @relation(fields: [userId], references: [id])
   amountKobo   Int
   status       WithdrawalStatus @default(PENDING)
+  // PROVIDER_EARNINGS: existing marketplace-earnings payout, destination
+  // bank comes from ProviderProfile. WALLET: withdrawal of a manually
+  // top-up-funded wallet balance, available to any user (provider or
+  // renter) — destination bank is supplied on the withdrawal form itself.
+  source       WithdrawalSource @default(PROVIDER_EARNINGS)
   destinationBankCode String
   destinationBankName String?
   destinationAccountNumber String
@@ -583,98 +631,9 @@ enum WithdrawalStatus {
   FAILED
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────
-// WALLETS, SUBSCRIPTIONS & COMMUNITY
-// ─────────────────────────────────────────────────────────────────────────
-
-model WalletTopup {
-  id                String   @id @default(cuid())
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  providerReference String   @unique
-  amountKobo        Int
-  status            WalletTopupStatus @default(PENDING)
-  createdAt         DateTime @default(now())
-  paidAt            DateTime?
-  adminNotifiedAt   DateTime?
-
-  @@index([userId, status])
-}
-
-enum WalletTopupStatus {
-  PENDING
-  PAID
-  FAILED
-}
-
-enum AccountSubscriptionStatus {
-  TRIALING
-  ACTIVE
-  PAST_DUE
-  CANCELLED
-  EXPIRED
-  PENDING
-}
-
-model AccountSubscription {
-  id                 String   @id @default(cuid())
-  userId             String
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tier               AccountSubscriptionTier
-  planCode           String
-  status             AccountSubscriptionStatus @default(PENDING)
-  trialEndsAt        DateTime?
-  currentPeriodEnd   DateTime?
-  paystackCustomerCode String?
-  paystackAuthorizationCode String?
-  paystackSubscriptionCode String?
-  lastReference      String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  @@index([userId, status])
-  @@index([planCode])
-}
-
-enum AccountSubscriptionTier {
-  STARTER
-  ETERNAL
-  PRO
-}
-
-model ChatThread {
-  id          String   @id @default(cuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  participants ChatParticipant[]
-  messages    ChatMessage[]
-
-  @@index([updatedAt])
-}
-
-model ChatParticipant {
-  id        String   @id @default(cuid())
-  threadId  String
-  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-
-  @@unique([threadId, userId])
-  @@index([userId])
-}
-
-model ChatMessage {
-  id        String   @id @default(cuid())
-  threadId  String
-  thread   ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  senderId  String
-  sender    User @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  body      String
-  createdAt DateTime @default(now())
-
-  @@index([threadId, createdAt])
+enum WithdrawalSource {
+  PROVIDER_EARNINGS
+  WALLET
 }
 
 // ─────────────────────────────────────────────────────────────────────────
