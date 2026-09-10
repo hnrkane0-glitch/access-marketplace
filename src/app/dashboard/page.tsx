@@ -7,6 +7,7 @@ import { LedgerEntryType, LedgerEntryStatus } from "@prisma/client";
 import { Wallet, ShieldCheck, CalendarClock, Compass, Sparkles, ArrowRight, CalendarDays } from "lucide-react";
 import WalletCard from "@/components/wallet-card";
 import SubscriptionBanner from "@/components/subscription-banner";
+import { getSubscriptionSafe } from "@/lib/subscription";
 
 function naira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString()}`;
@@ -53,7 +54,7 @@ export default async function DashboardPage() {
     }),
     getCustomerReservedDepositsKobo(user.id),
     getWalletBalanceKobo(user.id),
-    db.subscription.findUnique({ where: { userId: user.id } }),
+    getSubscriptionSafe(user.id),
   ]);
 
   const upcoming = bookings.filter((b) =>

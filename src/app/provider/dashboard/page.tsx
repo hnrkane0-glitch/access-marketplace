@@ -8,6 +8,7 @@ import { CATEGORY_ICON, CATEGORY_TINT, DEFAULT_CATEGORY_ICON, DEFAULT_CATEGORY_T
 import WithdrawForm from "./withdraw-form";
 import WalletCard from "@/components/wallet-card";
 import SubscriptionBanner from "@/components/subscription-banner";
+import { getSubscriptionSafe } from "@/lib/subscription";
 
 const STATUS_STYLE: Record<string, string> = {
   ACTIVE: "bg-emerald-100 text-emerald-700",
@@ -38,7 +39,7 @@ export default async function ProviderDashboardPage() {
     getProviderAvailableBalanceKobo(user.id),
     getProviderPendingBalanceKobo(user.id),
     getWalletBalanceKobo(user.id),
-    db.subscription.findUnique({ where: { userId: user.id } }),
+    getSubscriptionSafe(user.id),
     db.listing.findMany({
       where: { providerId: user.id },
       include: { category: true, media: { orderBy: { sortOrder: "asc" }, take: 1 } },

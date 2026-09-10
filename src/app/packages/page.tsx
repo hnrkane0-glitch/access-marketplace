@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { getSubscriptionSafe } from "@/lib/subscription";
 import { fetchPlan } from "@/lib/paystack";
 import { planCodeForTier, type PackageTier } from "@/lib/subscription-plans";
 import PackagePicker from "./package-picker";
@@ -15,7 +15,7 @@ export default async function PackagesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const existing = await db.subscription.findUnique({ where: { userId: user.id } });
+  const existing = await getSubscriptionSafe(user.id);
   if (existing && (existing.status === "ACTIVE" || existing.status === "TRIALING")) {
     redirect(user.isProvider ? "/provider/dashboard" : "/dashboard");
   }
